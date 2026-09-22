@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ALVIYA DAIRY | Production Milk Collection System</title>
+  <meta name="theme-color" content="#0b63ce" />
+
+  <!-- External libraries: Excel generation, QR code rendering, and Supabase client -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Production Styles -->
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+</head>
+<body>
+  <!-- Floating background ambiance -->
+  <div class="orb one"></div>
+  <div class="orb two"></div>
+
+  <div class="app-shell">
+
+    <!-- LOGIN SCREEN -->
+    <section id="loginView" class="login-wrap">
+      <div class="login-card glass">
+        <div class="login-hero">
+          <div class="brand" style="color:white">
+            <img class="logo-mark" src="assets/logo.png" alt="ALVIYA DAIRY logo" />
+            <div>
+              <div class="brand-title">ALVIYA DAIRY</div>
+              <small style="color:#e5f4ff">Milk Collection System</small>
+            </div>
+          </div>
+          <h1>Smart dairy operations, made simple.</h1>
+          <p>Manage centers, farmers, milk collection, automatic TS-based rates, billing cycles, reports and secure backups from one premium dashboard.</p>
+          <div class="hero-pills">
+            <span>Automatic Billing</span>
+            <span>Advance Deduction</span>
+            <span>TS Rate Control</span>
+            <span>Excel Export</span>
+            <span>A4 Print Bill</span>
+          </div>
+        </div>
+
+        <div class="login-panel">
+          <h2>Secure Login</h2>
+          <p class="sub">Main Owner and Center Owners use the same login page.</p>
+
+          <form id="loginForm">
+            <div class="field">
+              <label>User ID / Center ID</label>
+              <input id="loginUserId" class="input" autocomplete="username" placeholder="e.g. ALVIYA-MAIN or KARUR01" required />
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <input id="loginPassword" class="input" type="password" autocomplete="current-password" placeholder="Enter password" required />
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">Login to ALVIYA DAIRY</button>
+            <div class="login-actions">
+              <button id="forgotPasswordBtn" class="btn btn-ghost btn-sm" type="button">Forgot / Reset Password</button>
+            </div>
+            <div class="credential-note" id="loginHint">
+              Main Owner ID: <b>ALVIYA-MAIN</b> &nbsp; • &nbsp; First login activates the production account using the registered owner email.
+            </div>
+          </form>
+
+          <div id="resetPanel" class="reset-panel hidden">
+            <h3>Reset Password</h3>
+            <p>Main Owner password recovery is sent to the registered email. Center Owner password changes are managed securely by the Main Owner.</p>
+            <form id="resetPasswordForm">
+              <div class="field">
+                <label>User ID / Center ID</label>
+                <input id="resetUserId" class="input" required placeholder="Account ID" />
+              </div>
+              <div class="field">
+                <label>Recovery PIN / Recovery Code</label>
+                <input id="resetRecovery" class="input" type="password" required placeholder="Recovery credential" />
+              </div>
+              <div class="field">
+                <label>New Password</label>
+                <input id="resetNewPassword" class="input" type="password" minlength="6" required placeholder="At least 6 characters" />
+              </div>
+              <div class="field">
+                <label>Confirm New Password</label>
+                <input id="resetConfirmPassword" class="input" type="password" minlength="6" required placeholder="Re-enter new password" />
+              </div>
+              <div class="login-actions">
+                <button class="btn btn-primary" type="submit">Reset Password</button>
+                <button id="cancelResetBtn" class="btn btn-ghost" type="button">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAIN APP SCREEN -->
+    <section id="appView" class="hidden">
+      <!-- TOP NAVIGATION BAR -->
+      <header class="topbar glass">
+        <div class="brand">
+          <img class="logo-mark" src="assets/logo.png" alt="ALVIYA DAIRY logo" />
+          <div>
+            <div class="brand-title">ALVIYA DAIRY</div>
+            <small>Management Console</small>
+          </div>
+        </div>
+        <div class="top-actions">
+          <span id="roleChip" class="role-chip">Main Owner</span>
+          <span id="centerChip" class="center-chip hidden"></span>
+          <button id="backCentersBtn" class="btn btn-soft btn-sm hidden">← Centers</button>
+          <button id="logoutBtn" class="btn btn-ghost btn-sm">Logout</button>
+        </div>
+      </header>
+
+      <div class="layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar glass">
+          <div class="nav-title">Navigation</div>
+          <nav id="nav" class="nav"></nav>
+          <div class="sidebar-footer">ALVIYA DAIRY Management<br/>Production cloud database enabled.</div>
+        </aside>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="content">
+
+          <!-- CENTERS PAGE (Main Owner Only) -->
+          <section id="centersPage" class="page active">
+            <div class="page-head">
+              <div>
+                <h1>Centers</h1>
+                <p>Create and manage your ALVIYA DAIRY collection centers.</p>
+              </div>
+              <button id="addCenterBtn" class="btn btn-primary no-print">+ Create Center</button>
+            </div>
+
+            <div id="centerFormCard" class="card glass hidden no-print" style="margin-bottom:16px">
+              <div class="card-head">
+                <div>
+                  <h3 id="centerFormTitle">Create Center</h3>
+                  <p>Main Owner can create a center and assign its login ID, password and recovery code. Credentials are stored securely.</p>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="closeCenterForm" type="button">Close</button>
+              </div>
+              <form id="centerForm" class="form-grid">
+                <input id="editCenterId" type="hidden" />
+                <div class="field">
+                  <label>Center Name</label>
+                  <input id="newCenterName" class="input" required placeholder="e.g. Karur Center" />
+                </div>
+                <div class="field">
+                  <label>Center ID</label>
+                  <input id="newCenterCode" class="input" required maxlength="20" placeholder="e.g. KARUR01" style="text-transform:uppercase" />
+                  <div class="helper">This is the Center Owner user ID used on the common login page.</div>
+                </div>
+                <div class="field">
+                  <label>Center Password <span class="muted">(leave blank while editing to keep current)</span></label>
+                  <input id="newCenterPassword" class="input" type="text" minlength="6" required placeholder="e.g. Karur@123" />
+                  <div class="helper">Main Owner can change this password at any time.</div>
+                </div>
+                <div class="field">
+                  <label>Recovery Code <span class="muted">(leave blank while editing to keep current)</span></label>
+                  <input id="newCenterRecovery" class="input" required maxlength="24" placeholder="e.g. KARUR-RESET-01" style="text-transform:uppercase" />
+                  <div class="helper">Used only when the Center Owner forgets the password.</div>
+                </div>
+                <div class="full" style="display:flex;gap:10px;flex-wrap:wrap">
+                  <button id="generateCenterCodeBtn" class="btn btn-soft" type="button">Generate ID & Recovery</button>
+                  <button class="btn btn-primary" type="submit"><span id="centerSubmitText">Create Center</span></button>
+                </div>
+              </form>
+            </div>
+
+            <div id="centerList" class="center-list"></div>
+
+            <!-- ALL-CENTER FARMER BANK DETAILS -->
+            <div id="mainDashboardBankCard" class="card glass" style="margin-top:18px">
+              <div class="card-head">
+                <div>
+                  <h3>Farmer Bank Details</h3>
+                  <p>Main Owner only • view and manage bank details for farmers across all centers.</p>
+                </div>
+                <span class="badge badge-blue">Private</span>
+              </div>
+              <div class="search-bar no-print" style="margin-bottom:14px">
+                <div class="field">
+                  <label>Center</label>
+                  <select id="mainBankCenterFilter" class="input">
+                    <option value="">All Centers</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Search Farmer / Milk No</label>
+                  <input id="mainBankSearch" class="input" placeholder="Search farmer or milk number"/>
+                </div>
+                <div class="field">
+                  <label>Bank Status</label>
+                  <select id="mainBankStatusFilter" class="input">
+                    <option value="">All</option>
+                    <option value="added">Bank Added</option>
+                    <option value="pending">Bank Pending</option>
+                  </select>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Center</th>
+                      <th>Milk No</th>
+                      <th>Farmer</th>
+                      <th>Account Holder</th>
+                      <th>Bank</th>
+                      <th>Account No</th>
+                      <th>IFSC</th>
+                      <th>Branch</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="mainDashboardBankTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- OVERVIEW / DASHBOARD PAGE -->
+          <section id="overviewPage" class="page">
+            <div class="page-head">
+              <div>
+                <h1 id="overviewTitle">Center Dashboard</h1>
+                <p>Farmers, collections, advances, bills, reports and backups.</p>
+              </div>
+            </div>
+            <div class="grid grid-4" id="centerStats"></div>
+            <div class="grid grid-2" style="margin-top:16px">
+              <div class="card glass">
+                <div class="card-head">
+                  <div>
+                    <h3>Billing Cycle</h3>
+                    <p id="cycleText"></p>
+                  </div>
+                  <span class="badge badge-blue">Automatic</span>
+                </div>
+                <div class="notice info">Cycles are generated automatically as <b>1–10</b>, <b>11–20</b>, and <b>21–month end</b>.</div>
+              </div>
+              <div class="card glass">
+                <div class="card-head">
+                  <div>
+                    <h3>Current TS</h3>
+                    <p>Rate multiplier for this center.</p>
+                  </div>
+                  <span id="overviewTS" class="badge badge-green">2.80</span>
+                </div>
+                <div class="notice success">Rate = (FAT + SNF) × TS &nbsp; • &nbsp; Amount = Rate × Liters</div>
+              </div>
+            </div>
+
+            <!-- CENTER FARMER BANK DETAILS (Main Owner Only) -->
+            <div id="mainOwnerBankCard" class="card glass hidden" style="margin-top:16px">
+              <div class="card-head">
+                <div>
+                  <h3>Farmer Bank Details</h3>
+                  <p>Main Owner only • bank information for farmers in this center.</p>
+                </div>
+                <span class="badge badge-blue">Private</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Milk No</th>
+                      <th>Farmer</th>
+                      <th>Account Holder</th>
+                      <th>Bank</th>
+                      <th>Account No</th>
+                      <th>IFSC</th>
+                      <th>Branch</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bankDetailsTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- FARMERS PAGE -->
+          <section id="farmersPage" class="page">
+            <div class="page-head">
+              <div>
+                <h1>Farmers</h1>
+                <p>No farmer login. Farmers are identified by Milk Number and Name.</p>
+              </div>
+              <button id="addFarmerBtn" class="btn btn-primary no-print">+ Add Farmer</button>
+            </div>
+            <div id="farmerFormCard" class="card glass hidden no-print" style="margin-bottom:16px">
+              <div class="card-head">
+                <div>
+                  <h3 id="farmerFormTitle">Add Farmer</h3>
+                  <p id="farmerFormNote">Create farmer identification.</p>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="closeFarmerForm" type="button">Close</button>
+              </div>
+              <form id="farmerForm" class="form-grid">
+                <input id="editFarmerId" type="hidden" />
+                <div class="field">
+                  <label>Milk No</label>
+                  <input id="farmerMilkNo" class="input" required placeholder="e.g. 1001"/>
+                </div>
+                <div class="field">
+                  <label>Farmer Name</label>
+                  <input id="farmerName" class="input" required placeholder="Farmer name"/>
+                </div>
+                <div id="farmerBankFields" class="full hidden">
+                  <div class="notice info" style="margin-bottom:14px">
+                    <b>Bank Details — Main Owner only.</b> These details are stored with this farmer under the selected center.
+                  </div>
+                  <div class="bank-grid">
+                    <div class="field">
+                      <label>Account Holder Name</label>
+                      <input id="bankHolder" class="input" placeholder="Name as per bank account"/>
+                    </div>
+                    <div class="field">
+                      <label>Bank Name</label>
+                      <input id="bankName" class="input" placeholder="e.g. Indian Bank"/>
+                    </div>
+                    <div class="field">
+                      <label>Account Number</label>
+                      <input id="bankAccount" class="input" inputmode="numeric" placeholder="Account number"/>
+                    </div>
+                    <div class="field">
+                      <label>IFSC Code</label>
+                      <input id="bankIfsc" class="input" placeholder="e.g. IDIB000K001" style="text-transform:uppercase"/>
+                    </div>
+                    <div class="field full">
+                      <label>Branch</label>
+                      <input id="bankBranch" class="input" placeholder="Bank branch"/>
+                    </div>
+                  </div>
+                </div>
+                <div class="full">
+                  <button class="btn btn-primary" type="submit"><span id="farmerSubmitText">Save Farmer</span></button>
+                </div>
+              </form>
+            </div>
+            <div class="card glass">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Milk No</th>
+                      <th>Farmer Name</th>
+                      <th>Center</th>
+                      <th>Bank Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="farmersTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- MILK COLLECTION PAGE -->
+          <section id="collectionPage" class="page">
+            <div class="page-head">
+              <div>
+                <h1>Milk Collection</h1>
+                <p>Morning and evening collection with automatic TS calculation.</p>
+              </div>
+            </div>
+            <div class="grid grid-2">
+              <div class="card glass no-print">
+                <div class="card-head">
+                  <div>
+                    <h3>New Collection</h3>
+                    <p>Enter quantity and milk quality values.</p>
+                  </div>
+                  <div class="segmented">
+                    <button id="morningBtn" class="active" type="button">Morning</button>
+                    <button id="eveningBtn" type="button">Evening</button>
+                  </div>
+                </div>
+                <form id="collectionForm" class="form-grid">
+                  <div class="field full">
+                    <label>Farmer</label>
+                    <select id="collectionFarmer" class="input" required></select>
+                  </div>
+                  <div class="field">
+                    <label>Date</label>
+                    <input id="collectionDate" class="input" type="date" required/>
+                  </div>
+                  <div class="field">
+                    <label>Liters</label>
+                    <input id="liters" class="input" type="number" step="0.01" min="0.01" required placeholder="0.00"/>
+                  </div>
+                  <div class="field">
+                    <label>FAT</label>
+                    <input id="fat" class="input" type="number" step="0.1" min="0" required placeholder="e.g. 4.2"/>
+                  </div>
+                  <div class="field">
+                    <label>SNF</label>
+                    <input id="snf" class="input" type="number" step="0.1" min="0" required placeholder="e.g. 8.5"/>
+                  </div>
+                  <div class="full calc-box">
+                    <div class="calc-item">
+                      <span>Current TS</span>
+                      <strong id="calcTS">2.80</strong>
+                    </div>
+                    <div class="calc-item">
+                      <span>Rate / Liter</span>
+                      <strong id="calcRate">₹0.00</strong>
+                    </div>
+                    <div class="calc-item">
+                      <span>Amount</span>
+                      <strong id="calcAmount">₹0.00</strong>
+                    </div>
+                  </div>
+                  <div class="full">
+                    <button class="btn btn-primary btn-block" type="submit">Save Milk Collection</button>
+                  </div>
+                </form>
+              </div>
+              <div class="card glass">
+                <div class="card-head">
+                  <div>
+                    <h3>Formula</h3>
+                    <p>Controlled by Main Owner TS value.</p>
+                  </div>
+                </div>
+                <div class="ts-hero glass" style="box-shadow:none">
+                  <div class="ts-label">Automatic Calculation</div>
+                  <div style="font-size:25px;font-weight:900;margin:12px 0 4px">Rate = (FAT + SNF) × TS</div>
+                  <div style="font-size:21px;font-weight:850">Amount = Rate × Liters</div>
+                  <p class="ts-note">Center Owners can view the TS value but cannot edit it.</p>
+                </div>
+              </div>
+            </div>
+            <div class="card glass" style="margin-top:16px">
+              <div class="card-head">
+                <div>
+                  <h3>Recent Collections</h3>
+                  <p>Latest entries for this center.</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Milk No</th>
+                      <th>Farmer</th>
+                      <th>Session</th>
+                      <th class="num">Liters</th>
+                      <th class="num">FAT</th>
+                      <th class="num">SNF</th>
+                      <th class="num">Rate</th>
+                      <th class="num">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody id="collectionTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- ADVANCES PAGE -->
+          <section id="advancesPage" class="page">
+            <div class="page-head">
+              <div>
+                <h1>Advance Payments</h1>
+                <p>Store farmer advances and deduct them automatically from the matching 10-day bill.</p>
+              </div>
+            </div>
+            <div id="advanceReadonlyBanner" class="notice info readonly-banner hidden">Center Owner access is read-only. Only the Main Owner can add or delete advance payments.</div>
+            <div class="grid grid-2">
+              <div id="advanceFormCard" class="card glass no-print">
+                <div class="card-head">
+                  <div>
+                    <h3>Add Farmer Advance</h3>
+                    <p>Advance paid by the Main Dealer / Main Owner.</p>
+                  </div>
+                  <span class="badge badge-blue">Main Owner</span>
+                </div>
+                <form id="advanceForm" class="form-grid">
+                  <div class="field full">
+                    <label>Farmer</label>
+                    <select id="advanceFarmer" class="input" required></select>
+                  </div>
+                  <div class="field">
+                    <label>Advance Date</label>
+                    <input id="advanceDate" class="input" type="date" required/>
+                  </div>
+                  <div class="field">
+                    <label>Advance Amount</label>
+                    <input id="advanceAmount" class="input" type="number" min="0.01" step="0.01" placeholder="₹ 0.00" required/>
+                  </div>
+                  <div class="field full">
+                    <label>Note / Reason</label>
+                    <input id="advanceNote" class="input" placeholder="Optional note, e.g. feed purchase / personal advance"/>
+                  </div>
+                  <div class="full notice warning">
+                    The advance is assigned to the automatic 10-day cycle containing the selected date. That cycle's bill will show <b>Gross Milk Amount − Advance = Net Payable</b>.
+                  </div>
+                  <div class="full">
+                    <button id="saveAdvanceBtn" class="btn btn-primary btn-block" type="submit">Save Advance</button>
+                  </div>
+                </form>
+              </div>
+              <div class="advance-summary">
+                <div class="k" style="font-size:12px;color:#8a6a34;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Current Cycle Advances</div>
+                <div id="advanceCycleTotal" class="v">₹0.00</div>
+                <div id="advanceCycleLabel" class="s" style="font-size:12px;color:#8f7a58;margin-top:5px">Current billing cycle</div>
+                <div class="notice info" style="margin-top:16px">Multiple advances for the same farmer are added together and deducted from that farmer's 10-day gross milk amount.</div>
+              </div>
+            </div>
+            <div class="card glass" style="margin-top:16px">
+              <div class="card-head">
+                <div>
+                  <h3>Advance History</h3>
+                  <p>All advance entries for this center.</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Billing Cycle</th>
+                      <th>Milk No</th>
+                      <th>Farmer</th>
+                      <th class="num">Advance</th>
+                      <th>Note</th>
+                      <th>Recorded By</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="advanceTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- TS MANAGEMENT PAGE -->
+          <section id="tsPage" class="page">
+            <div class="page-head">
+              <div>
+                <h1>TS Management</h1>
+                <p>Main Owner controls the rate multiplier. Center Owner access is read-only.</p>
+              </div>
+            </div>
+            <div class="ts-hero glass">
+              <div class="ts-label">Current TS</div>
+              <div id="tsValueBig" class="ts-value">2.80</div>
+              <div class="ts-note">This value is used in every new milk collection: <b>Rate = (FAT + SNF) × TS</b>.</div>
+            </div>
+            <div class="card glass" style="margin-top:16px">
+              <div class="card-head">
+                <div>
+                  <h3>Change TS</h3>
+                  <p id="tsPermissionText">Main Owner only.</p>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label>New TS</label>
+                  <input id="newTS" type="number" step="0.01" min="0" class="input" placeholder="2.80"/>
+                </div>
+                <div class="field" style="display:flex;align-items:end">
+                  <button id="saveTSBtn" class="btn btn-primary btn-block">Update TS</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- BILLS PAGE (A4 PRINT OPTIMIZED) -->
+          <section id="billsPage" class="page">
+            <div class="page-head no-print">
+              <div>
+                <h1>Bills</h1>
+                <p>Automatic 10-day billing with advance deduction and A4 print format.</p>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button id="printBillBtn" class="btn btn-primary">Print / Save PDF</button>
+              </div>
+            </div>
+            <div class="card glass no-print" style="margin-bottom:16px">
+              <div class="form-grid">
+                <div class="field">
+                  <label>Farmer</label>
+                  <select id="billFarmer" class="input"></select>
+                </div>
+                <div class="field">
+                  <label>Billing Cycle</label>
+                  <select id="billCycle" class="input"></select>
+                </div>
+              </div>
+            </div>
+            <div id="billSheet" class="bill-sheet">
+              <div class="bill-header">
+                <div class="bill-company">
+                  <img class="bill-logo-img" src="assets/logo.png" alt="ALVIYA DAIRY logo" />
+                  <div>
+                    <h2>ALVIYA DAIRY</h2>
+                    <p>Quality Milk Collection & Farmer Billing</p>
+                  </div>
+                </div>
+                <div class="bill-meta">
+                  <b>FARMER MILK BILL</b><br/>
+                  <span id="billCenterName">Center</span><br/>
+                  <span id="billPeriodText">Period</span>
+                </div>
+              </div>
+              <div class="bill-farmer">
+                <div><span>Milk No</span><strong id="billMilkNo">-</strong></div>
+                <div><span>Farmer Name</span><strong id="billFarmerName">-</strong></div>
+                <div><span>Generated</span><strong id="billGenerated">-</strong></div>
+              </div>
+              <div class="bill-bank">
+                <div class="bill-bank-title">
+                  <b>Payment Account Details</b>
+                  <small>Farmer bank information</small>
+                </div>
+                <div class="bank-item"><span>Account Holder</span><strong id="billBankHolder">-</strong></div>
+                <div class="bank-item"><span>Bank Name</span><strong id="billBankName">-</strong></div>
+                <div class="bank-item"><span>Account Number</span><strong id="billBankAccount">-</strong></div>
+                <div class="bank-item"><span>IFSC</span><strong id="billBankIfsc">-</strong></div>
+                <div class="bank-item"><span>Branch</span><strong id="billBankBranch">-</strong></div>
+              </div>
+              <div class="bill-session-grid">
+                <section class="bill-session morning">
+                  <div class="bill-session-title">
+                    <span>☀ Morning Session</span>
+                    <span id="morningCount">0 entries</span>
+                  </div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th class="num">Ltr</th>
+                          <th class="num">FAT</th>
+                          <th class="num">SNF</th>
+                          <th class="num">Rate</th>
+                          <th class="num">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody id="morningBillTbody"></tbody>
+                    </table>
+                  </div>
+                  <div class="session-subtotal">
+                    <span>Morning Liters</span>
+                    <b id="morningBillLiters">0.00 L</b>
+                    <span>Morning Amount</span>
+                    <b id="morningBillAmount">₹0.00</b>
+                  </div>
+                </section>
+                <section class="bill-session evening">
+                  <div class="bill-session-title">
+                    <span>☾ Evening Session</span>
+                    <span id="eveningCount">0 entries</span>
+                  </div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th class="num">Ltr</th>
+                          <th class="num">FAT</th>
+                          <th class="num">SNF</th>
+                          <th class="num">Rate</th>
+                          <th class="num">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody id="eveningBillTbody"></tbody>
+                    </table>
+                  </div>
+                  <div class="session-subtotal">
+                    <span>Evening Liters</span>
+                    <b id="eveningBillLiters">0.00 L</b>
+                    <span>Evening Amount</span>
+                    <b id="eveningBillAmount">₹0.00</b>
+                  </div>
+                </section>
+              </div>
+              <div class="bill-total">
+                <div class="bill-total-box">
+                  <div class="bill-total-row"><span>Total Liters</span><b id="billLiters">0.00 L</b></div>
+                  <div class="bill-total-row"><span>Gross Milk Amount</span><b id="billGrossAmount">₹0.00</b></div>
+                  <div class="bill-total-row deduction"><span>Advance Deduction</span><b id="billAdvanceAmount">− ₹0.00</b></div>
+                  <div id="billAdvanceBalanceRow" class="bill-total-row hidden"><span>Advance Balance</span><b id="billAdvanceBalance">₹0.00</b></div>
+                  <div class="bill-total-row grand"><span>Net Payable</span><span id="billAmount">₹0.00</span></div>
+                  <div id="billAdvanceNote" class="bill-advance-note advance-zero">No advance recorded for this billing cycle.</div>
+                </div>
+              </div>
+              <div class="bill-footer">
+                <div class="qrbox">
+                  <div id="qrcode"></div>
+                  <div style="font-size:11px;color:#607286;line-height:1.5">ALVIYA DAIRY<br/>Bill Verification QR</div>
+                </div>
+                <div class="signature">Authorized Signature</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- REPORTS PAGE -->
+          <section id="reportsPage" class="page">
+            <div class="page-head">
+              <div>
+                <h1>Reports</h1>
+                <p>Search by Milk Number, Farmer, Center or Date.</p>
+              </div>
+              <button id="exportReportBtn" class="btn btn-green no-print">Export Excel</button>
+            </div>
+            <div class="card glass no-print" style="margin-bottom:16px">
+              <div class="search-bar">
+                <div class="field">
+                  <label>Milk Number</label>
+                  <input id="reportMilkNo" class="input" placeholder="All"/>
+                </div>
+                <div class="field">
+                  <label>Farmer</label>
+                  <input id="reportFarmer" class="input" placeholder="All"/>
+                </div>
+                <div class="field">
+                  <label>Center</label>
+                  <select id="reportCenter" class="input"></select>
+                </div>
+                <div class="field">
+                  <label>Date</label>
+                  <input id="reportDate" class="input" type="date"/>
+                </div>
+                <button id="searchReportBtn" class="btn btn-primary">Search</button>
+              </div>
+            </div>
+            <div class="card glass">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Center</th>
+                      <th>Milk No</th>
+                      <th>Farmer</th>
+                      <th>Session</th>
+                      <th class="num">Liters</th>
+                      <th class="num">FAT</th>
+                      <th class="num">SNF</th>
+                      <th class="num">Rate</th>
+                      <th class="num">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reportsTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- BACKUP & EXPORT PAGE -->
+          <section id="backupPage" class="page">
+            <div class="page-head">
+              <div>
+                <h1>Backup & Export</h1>
+                <p>Export business data and restore previous backups.</p>
+              </div>
+            </div>
+            <div class="backup-grid">
+              <div class="backup-action">
+                <div class="big">📊</div>
+                <h3>Excel</h3>
+                <p>Export collection data with Date, Morning, Evening, FAT, SNF, Rate and Amount.</p>
+                <button id="excelBtn" class="btn btn-green btn-block">Export Excel</button>
+              </div>
+              <div class="backup-action">
+                <div class="big">📄</div>
+                <h3>PDF</h3>
+                <p>Open the professional bill for printing or saving as a PDF document.</p>
+                <button id="pdfBtn" class="btn btn-primary btn-block">Print Bill PDF</button>
+              </div>
+              <div class="backup-action">
+                <div class="big">🗃️</div>
+                <h3>JSON</h3>
+                <p>Download a complete structured backup of centers, farmers, TS, collections and advances.</p>
+                <button id="jsonBtn" class="btn btn-soft btn-block">Download JSON</button>
+              </div>
+              <div class="backup-action">
+                <div class="big">♻️</div>
+                <h3>Restore</h3>
+                <p>Restore ALVIYA DAIRY data from a previously downloaded JSON backup.</p>
+                <button id="restoreBtn" class="btn btn-ghost btn-block">Choose Backup</button>
+                <input id="restoreInput" type="file" accept="application/json,.json" class="hidden"/>
+              </div>
+            </div>
+            <div class="notice success" style="margin-top:16px">Production cloud backup is enabled. Center, farmer, collection, advance and TS data are synchronized securely.</div>
+          </section>
+        </main>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- Main ES Module Application Script -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
